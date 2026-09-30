@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Daily Project Status · IoT Security Ecosystem and Sandbox</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600&family=Inter:wght@400;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{--navy:#0B1B33;--navy2:#12284a;--cyan:#22D3EE;--ink:#e8f1fb;--mute:#8fa6c2;--line:#24406a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--navy);color:var(--ink);font:15px/1.5 Inter,Arial,sans-serif;min-height:100vh}
+header{padding:16px 28px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+header b{font-family:Fraunces,serif;font-size:20px}header small{display:block;color:var(--mute);font-size:12px}
+.eyebrow{font:500 12px 'JetBrains Mono',monospace;color:var(--cyan);letter-spacing:.12em}
+.wrap{max-width:860px;margin:28px auto;padding:0 18px}
+.card{background:var(--navy2);border:1px solid var(--line);border-radius:10px;padding:24px;margin-bottom:20px}
+h1,h2{font-family:Fraunces,serif;margin:6px 0 14px}h1{font-size:28px}h2{font-size:20px}
+label{display:block;margin:14px 0 5px;font-weight:600;font-size:13px;color:var(--mute)}
+input,select,textarea{width:100%;padding:10px;background:var(--navy);color:var(--ink);border:1px solid var(--line);border-radius:6px;font:inherit}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--cyan)}
+button,.btn{display:inline-block;background:var(--cyan);color:var(--navy);border:0;padding:10px 20px;border-radius:6px;font:600 14px Inter;cursor:pointer;margin-top:16px;text-decoration:none}
+.ghost{background:none;color:var(--cyan);border:1px solid var(--cyan);margin:16px 0 0 8px}
+header .ghost{margin:0 0 0 8px}
+.msg{padding:9px 12px;border-radius:6px;margin-bottom:14px;font-size:14px}.ok{background:#0f3b3a;color:#7ff0d0}.err{background:#4a1f2a;color:#ffb3c0}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{font:500 11px 'JetBrains Mono',monospace;letter-spacing:.1em;color:var(--cyan);text-align:left}
+td,th{border-bottom:1px solid var(--line);padding:8px 6px;vertical-align:top;white-space:pre-wrap}
+small.n{color:var(--mute);display:block;margin-top:10px}
+footer{text-align:center;color:var(--mute);font-size:12px;padding:20px}
+[hidden]{display:none!important}
+</style></head><body>
+<header><div><b>IoT Security Ecosystem and Sandbox</b><small>C-DAC Bengaluru · Internal Project Daily Status</small></div>
+<span id="bar" hidden><span id="who" class="eyebrow"></span> <button class="btn ghost" onclick="logout()">Logout</button></span></header>
+<div class="wrap">
+<div id="msg" class="msg" hidden></div>
+
+<section id="login" class="card">
+<div class="eyebrow">STATUS.LOG · SIGN IN</div><h1>Log your day</h1>
+<form onsubmit="doLogin(event)"><label for="empId">Employee ID</label>
+<input id="empId" placeholder="e.g. 350050" autocomplete="off" required autofocus><button>Login</button></form>
+</section>
+
+<section id="app" hidden>
+<div class="card"><div class="eyebrow">STEP 1 OF 1 · ENTRY ONLINE</div><h1>Daily Status</h1>
+<form onsubmit="save(event)">
+<label for="day">Date (DD-MM-YYYY)</label><select id="day" onchange="fill()"></select>
+<label for="done">Completed Today</label>
+<textarea id="done" rows="7" required placeholder="1. Task 1 done&#10;2. Task 2 done"></textarea>
+<label for="block">Blockers</label>
+<textarea id="block" rows="3" placeholder="Leave blank if none"></textarea>
+<button>Submit</button><a id="xl" class="btn ghost" target="_blank" rel="noopener">Download Excel</a>
+<small class="n">After Submit, GitHub opens with your entry filled in &mdash; click <b>Submit new issue</b> there. The Excel file updates automatically within a minute or two.</small>
+</form></div>
+<div class="card"><h2>My recent submissions (this device)</h2>
+<table><thead><tr><th>DATE</th><th>COMPLETED TODAY</th><th>BLOCKERS</th></tr></thead><tbody id="hist"></tbody></table></div>
+</section></div>
+<footer>Centre for Development of Advanced Computing (C-DAC), Bengaluru · Government of India</footer>
+
+<script>
+// ---- CONFIG ----
+const REPO="vishnumohan350050/daily-status";   // <- owner/repo of the PRIVATE repo holding daily_status.xlsx
+const BRANCH="main";
+const EMPLOYEES={"348642":"Thirumala","348649":"Sibi","349661":"Dinesh","349722":"Abhinash","350050":"Vishnu"};
+const BACK_DAYS=1;                              // today + N previous day(s) open for entry
+const KEY="cdac_daily_status_v2";
+// ----------------
+const $=id=>document.getElementById(id);
+const load=()=>JSON.parse(localStorage.getItem(KEY)||"{}");
+const p2=n=>String(n).padStart(2,"0");
+const fmt=d=>p2(d.getDate())+"-"+p2(d.getMonth()+1)+"-"+d.getFullYear();
+const sortKey=s=>{const[a,b,c]=s.split("-");return+(c+b+a)};
+let emp=sessionStorage.getItem("emp");
+
+function msg(t,c){const m=$("msg");m.textContent=t;m.className="msg "+c;m.hidden=false;setTimeout(()=>m.hidden=true,8000)}
+function show(){$("login").hidden=!!emp;$("app").hidden=!emp;$("bar").hidden=!emp;if(emp)render()}
+function doLogin(e){e.preventDefault();const id=$("empId").value.trim();
+  if(!EMPLOYEES[id])return msg("Unknown Employee ID.","err");
+  emp=id;sessionStorage.setItem("emp",id);show()}
+function logout(){sessionStorage.removeItem("emp");emp=null;$("empId").value="";show()}
+function render(){$("who").textContent=EMPLOYEES[emp]+" · "+emp;
+  $("xl").href="https://github.com/"+REPO+"/raw/"+BRANCH+"/daily_status.xlsx";
+  const s=$("day");if(!s.options.length)for(let i=0;i<=BACK_DAYS;i++){const d=new Date();d.setDate(d.getDate()-i);s.add(new Option(fmt(d),fmt(d)))}
+  fill();table()}
+function fill(){const r=(load()[emp]||[]).find(x=>x.date===$("day").value);
+  $("done").value=r?r.completed:"";$("block").value=r&&r.blockers!=="-"?r.blockers:""}
+function save(e){e.preventDefault();const all=load(),rows=all[emp]||[],date=$("day").value;
+  const rec={date,completed:$("done").value.trim(),blockers:$("block").value.trim()||"-"};
+  const i=rows.findIndex(x=>x.date===date);i<0?rows.push(rec):rows[i]=rec;
+  rows.sort((a,b)=>sortKey(a.date)-sortKey(b.date));all[emp]=rows;
+  localStorage.setItem(KEY,JSON.stringify(all));table();
+  const body="EMP_ID: "+emp+"\nDATE: "+date+"\nCOMPLETED:\n"+rec.completed+"\nBLOCKERS:\n"+rec.blockers;
+  const url="https://github.com/"+REPO+"/issues/new?title="+encodeURIComponent("[Daily Status] "+emp+" "+date)+"&body="+encodeURIComponent(body);
+  window.open(url,"_blank");
+  msg("GitHub opened in a new tab — click 'Submit new issue' to finish.","ok")}
+function table(){const tb=$("hist");tb.innerHTML="";
+  [...(load()[emp]||[])].reverse().slice(0,10).forEach(r=>{const tr=tb.insertRow();
+    [r.date,r.completed,r.blockers].forEach(v=>tr.insertCell().textContent=v)})}
+show();
+</script></body></html>
