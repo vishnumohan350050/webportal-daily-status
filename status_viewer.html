@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Daily Status Viewer · IoT Security Ecosystem and Sandbox</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600&family=Inter:wght@400;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{--navy:#0B1B33;--navy2:#12284a;--cyan:#22D3EE;--ink:#e8f1fb;--mute:#8fa6c2;--line:#24406a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--navy);color:var(--ink);font:15px/1.5 Inter,Arial,sans-serif;min-height:100vh}
+header{padding:16px 28px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+header b{font-family:Fraunces,serif;font-size:20px}header small{display:block;color:var(--mute);font-size:12px}
+.eyebrow{font:500 12px 'JetBrains Mono',monospace;color:var(--cyan);letter-spacing:.12em}
+.wrap{max-width:1100px;margin:24px auto;padding:0 18px}
+.card{background:var(--navy2);border:1px solid var(--line);border-radius:10px;padding:20px;margin-bottom:18px}
+button,label.btn{display:inline-block;background:var(--cyan);color:var(--navy);border:0;padding:8px 16px;border-radius:6px;font:600 13px Inter;cursor:pointer}
+.ghost{background:none;color:var(--cyan);border:1px solid var(--cyan)}
+input[type=search]{padding:8px 10px;background:var(--navy);color:var(--ink);border:1px solid var(--line);border-radius:6px;font:inherit;min-width:220px}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
+.tab{background:var(--navy2);color:var(--mute);border:1px solid var(--line);padding:8px 14px;border-radius:6px;font:500 12px 'JetBrains Mono',monospace;cursor:pointer}
+.tab.on{background:var(--cyan);color:var(--navy);border-color:var(--cyan)}
+.bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px;color:var(--mute);font-size:13px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{font:500 11px 'JetBrains Mono',monospace;letter-spacing:.1em;color:var(--cyan);text-align:left;position:sticky;top:0;background:var(--navy2)}
+td,th{border-bottom:1px solid var(--line);padding:9px 8px;vertical-align:top;white-space:pre-wrap}
+tr.click{cursor:pointer}tr.click:hover{background:#183259}
+.yes{color:#7ff0d0}.no{color:#ffb3c0}
+.msg{padding:14px;border:1px dashed var(--line);border-radius:8px;color:var(--mute)}
+footer{text-align:center;color:var(--mute);font-size:12px;padding:20px}
+[hidden]{display:none!important}
+</style></head><body>
+<header><div><b>IoT Security Ecosystem and Sandbox</b><small>C-DAC Bengaluru · Daily Status Viewer</small></div>
+<div><button onclick="loadRemote()">Reload</button>
+<label class="btn ghost">Open Excel file…<input id="file" type="file" accept=".xlsx" hidden></label></div></header>
+<div class="wrap">
+<div id="info" class="msg" hidden></div>
+<div id="main" hidden>
+  <div class="eyebrow" id="stamp"></div>
+  <div class="tabs" id="tabs" style="margin-top:12px"></div>
+  <div class="card">
+    <div class="bar"><input id="q" type="search" placeholder="Search in this tab…" oninput="draw()">
+      <label><input id="newest" type="checkbox" checked onchange="draw()"> Newest first</label><span id="count"></span></div>
+    <div style="overflow-x:auto"><table><thead id="head"></thead><tbody id="body"></tbody></table></div>
+  </div>
+</div></div>
+<footer>Centre for Development of Advanced Computing (C-DAC), Bengaluru · Government of India</footer>
+
+<script>
+const FILE="daily_status.xlsx";           // looked up next to this page; otherwise use "Open Excel file…"
+const $=id=>document.getElementById(id);
+let EMPS=[],active="Overview";
+const p2=n=>String(n).padStart(2,"0");
+const fmt=d=>p2(d.getDate())+"-"+p2(d.getMonth()+1)+"-"+d.getFullYear();
+const key=s=>{const[a,b,c]=s.split("-");return+(c+b+a)||0};
+
+function parse(buf){
+  const wb=XLSX.read(buf,{type:"array",cellDates:true}),names={};
+  if(wb.Sheets["Employees"])XLSX.utils.sheet_to_json(wb.Sheets["Employees"],{header:1,raw:false}).slice(1)
+    .forEach(r=>{if(r[0])names[String(r[0]).trim()]=r[1]||""});
+  return wb.SheetNames.filter(n=>n!=="Employees").map(id=>({id,name:names[id]||"",
+    rows:XLSX.utils.sheet_to_json(wb.Sheets[id],{header:1,raw:false,dateNF:"dd-mm-yyyy",blankrows:false})
+      .slice(1).filter(r=>r[1]).map(r=>({n:r[0],date:String(r[1]),done:r[2]||"",block:r[3]||"-"}))}));
+}
+function info(t){const i=$("info");i.textContent=t;i.hidden=!t;if(t)$("main").hidden=true}
+function ready(buf,label){EMPS=parse(buf);active="Overview";$("main").hidden=false;info("");
+  $("stamp").textContent="SOURCE: "+label+" · LOADED "+new Date().toLocaleString();tabs();draw()}
+async function loadRemote(){
+  try{const r=await fetch(FILE+"?t="+Date.now(),{cache:"no-store"});if(!r.ok)throw 0;ready(await r.arrayBuffer(),FILE)}
+  catch(e){info("Could not load "+FILE+" from this site (private repos can't be read directly). Click “Open Excel file…” and choose the downloaded daily_status.xlsx.")}}
+$("file").onchange=async e=>{const f=e.target.files[0];if(f)ready(await f.arrayBuffer(),f.name)};
+addEventListener("dragover",e=>e.preventDefault());
+addEventListener("drop",async e=>{e.preventDefault();const f=e.dataTransfer.files[0];if(f)ready(await f.arrayBuffer(),f.name)});
+
+function tabs(){const t=$("tabs");t.innerHTML="";
+  [["Overview","OVERVIEW"],...EMPS.map(e=>[e.id,(e.name?e.name+" · ":"")+e.id])].forEach(([id,label])=>{
+    const b=document.createElement("button");b.className="tab"+(id===active?" on":"");b.textContent=label;
+    b.onclick=()=>{active=id;$("q").value="";tabs();draw()};t.appendChild(b)})}
+function row(tb,cells,cls){const tr=tb.insertRow();if(cls)tr.className=cls;
+  cells.forEach(c=>{const td=tr.insertCell();if(c&&c.t!==undefined){td.textContent=c.t;td.className=c.c||""}else td.textContent=c});return tr}
+function head(cols){const h=$("head");h.innerHTML="";const tr=h.insertRow();cols.forEach(c=>{const th=document.createElement("th");th.textContent=c;tr.appendChild(th)})}
+function draw(){const tb=$("body");tb.innerHTML="";
+  if(active==="Overview"){head(["EMPLOYEE ID","NAME","ENTRIES","LAST ENTRY","TODAY"]);
+    const today=fmt(new Date());
+    EMPS.forEach(e=>{const last=e.rows.reduce((m,r)=>key(r.date)>key(m)?r.date:m,"");const done=e.rows.some(r=>r.date===today);
+      const tr=row(tb,[e.id,e.name,String(e.rows.length),last||"-",{t:done?"Submitted":"Pending",c:done?"yes":"no"}],"click");
+      tr.onclick=()=>{active=e.id;tabs();draw()}});
+    $("count").textContent=EMPS.length+" employees";return}
+  const e=EMPS.find(x=>x.id===active),q=$("q").value.toLowerCase();
+  head(["#","DATE","COMPLETED TODAY","BLOCKERS"]);
+  let rows=e.rows.filter(r=>!q||(r.date+r.done+r.block).toLowerCase().includes(q));
+  rows.sort((a,b)=>(key(a.date)-key(b.date))*($("newest").checked?-1:1));
+  rows.forEach(r=>row(tb,[String(r.n),r.date,r.done,r.block]));
+  $("count").textContent=rows.length+" of "+e.rows.length+" entries"+(rows.length?"":" — nothing to show")}
+loadRemote();
+</script></body></html>
